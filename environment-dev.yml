@@ -5,8 +5,14 @@ dependencies:
   - python=3.10
   - setuptools
   - pip
-  - make
+  - numpy        # Add numpy back in
+  - plotly_express
+  - jupyterlab
+  - matplotlib
+  - scikit-learn
+  - make         # Dev dependencies start here
   - black
   - isort
   - flake8
   - autopep8
+

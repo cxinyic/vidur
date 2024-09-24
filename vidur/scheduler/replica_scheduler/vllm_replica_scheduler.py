@@ -2,10 +2,12 @@ from math import ceil
 from typing import List
 
 from vidur.entities.batch import Batch, Request
+from vidur.logger import init_logger
 from vidur.scheduler.replica_scheduler.base_replica_scheduler import (
     BaseReplicaScheduler,
 )
 
+logger = init_logger(__name__)
 
 class VLLMReplicaScheduler(BaseReplicaScheduler):
     def __init__(self, *args, **kwargs):
@@ -98,6 +100,42 @@ class VLLMReplicaScheduler(BaseReplicaScheduler):
 
         if requests:
             return Batch(self._replica_id, requests, num_tokens)
+
+        # Safer to sort preempted_requests to maintain FIFO order
+        self._preempted_requests.sort(key=lambda r: r.arrived_at)
+        # all preempted_requests will have prefill completed
+        while self._preempted_requests:
+            if len(requests) == self._max_micro_batch_size:
+                break
+
+            request = self._preempted_requests.pop(0)
+
+            while not self._can_allocate_request(request):
+                if self._preempted_requests:
+                    victim_request = self._preempted_requests.pop(-1)
+                    victim_request.restart()
+                    self.free(victim_request.id)
+                    self._request_queue = [victim_request] + self._request_queue
+                else:
+                    request.restart()
+                    self.free(request.id)
+                    self._request_queue = [request] + self._request_queue
+                    break
+            else:
+                self._allocate_request(request)
+                next_num_tokens = self._get_request_next_num_tokens(request)
+                requests.append(request)
+                num_tokens.append(next_num_tokens)
+
+        if not requests:
+            return
+
+        return Batch(self._replica_id, requests, num_tokens)
+
+    def _get_next_batch_upgrade(self) -> Batch:
+        # logger.info(f"running get_next_batch_upgrade,id: {self.replica_id}, with pending requests: {self.num_pending_requests}")
+        requests = []
+        num_tokens = []
 
         # Safer to sort preempted_requests to maintain FIFO order
         self._preempted_requests.sort(key=lambda r: r.arrived_at)

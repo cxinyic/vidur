@@ -23,7 +23,12 @@ class ReplicaScheduleEvent(BaseEvent):
         from vidur.events.batch_stage_arrival_event import BatchStageArrivalEvent
 
         replica_scheduler = scheduler.get_replica_scheduler(self._replica_id)
-        self._batches = replica_scheduler.on_schedule()
+        # If an upgrade event has been scheduled, do not schedule any new
+        # prefilling batches, but need to keep decoding batches
+        if self._upgrade_flag:
+            self._batches = replica_scheduler.on_upgrade()
+        else:
+            self._batches = replica_scheduler.on_schedule()
 
         if not self._batches:
             return []
@@ -53,3 +58,21 @@ class ReplicaScheduleEvent(BaseEvent):
             "replica_id": self._replica_id,
             "batch_ids": [batch.id for batch in self._batches],
         }
+
+    def to_chrome_trace(self) -> dict:
+        if self._batches:
+            return {
+                "event_type": EventType.REPLICA_SCHEDULE,
+                "ts": self.time * 1e6,
+                "replica_id": self._replica_id,
+                "batch": [
+                    {
+                        "batch_id": batch.id,
+                        "request_ids": batch.request_ids,
+                        "num_prefill_tokens": batch.num_prefill_tokens,
+                        "num_decode_tokens": batch.num_decode_tokens,
+                    }
+                    for batch in self._batches
+                ],
+            }
+        return None

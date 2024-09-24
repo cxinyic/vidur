@@ -9,6 +9,10 @@ class BaseEntity:
     @property
     def id(self) -> int:
         return self._id
+    
+    @classmethod
+    def set_back(cls):
+        cls._id = -1
 
     def __str__(self) -> str:
         # use to_dict to get a dict representation of the object

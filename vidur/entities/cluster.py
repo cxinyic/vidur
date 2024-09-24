@@ -24,6 +24,8 @@ class Cluster(BaseEntity):
         # Init replica object handles
         self._replicas = {}
 
+        Replica.set_back()
+
         for _ in range(self._config.num_replicas):
             replica = Replica(self._config.replica_config, generator_config)
             self._replicas[replica.id] = replica

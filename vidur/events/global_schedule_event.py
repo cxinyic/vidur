@@ -21,6 +21,9 @@ class GlobalScheduleEvent(BaseEvent):
     ) -> List[BaseEvent]:
         from vidur.events.replica_schedule_event import ReplicaScheduleEvent
 
+        # If an upgrade event has been scheduled, do not schedule any new requests
+        if self._upgrade_flag:
+            return []
         self._replica_set = set()
         self._request_mapping = scheduler.schedule()
 
@@ -43,3 +46,15 @@ class GlobalScheduleEvent(BaseEvent):
                 for replica_id, request in self._request_mapping
             ],
         }
+
+    # def to_chrome_trace(self) -> dict:
+    #     if self._request_mapping:
+    #         return {
+    #             "event_type": EventType.GLOBAL_SCHEDULE,
+    #             "ts": self.time * 1e6,
+    #             "request_mapping": [
+    #                 {"replica_id": replica_id, "request_id": request.id}
+    #                 for replica_id, request in self._request_mapping
+    #             ],
+    #         }
+    #     return None

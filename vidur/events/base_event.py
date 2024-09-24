@@ -15,6 +15,9 @@ class BaseEvent(ABC):
         self._event_type = event_type
         self._priority_number = self._get_priority_number()
 
+        # indicate whether to start upgrading
+        self._upgrade_flag = False
+
     @classmethod
     def generate_id(cls):
         cls._id += 1
@@ -70,3 +73,6 @@ class BaseEvent(ABC):
 
     def to_chrome_trace(self) -> dict:
         return None
+
+    def set_upgrade_flag(self):
+        self._upgrade_flag = True
