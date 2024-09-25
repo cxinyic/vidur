@@ -4,7 +4,7 @@ from vidur.events import BaseEvent
 from vidur.logger import init_logger
 from vidur.metrics import MetricsStore
 from vidur.scheduler import BaseGlobalScheduler
-from vidur.types import EventType
+from vidur.types import EventType, UpgradeType
 
 logger = init_logger(__name__)
 
@@ -25,7 +25,7 @@ class ReplicaScheduleEvent(BaseEvent):
         replica_scheduler = scheduler.get_replica_scheduler(self._replica_id)
         # If an upgrade event has been scheduled, do not schedule any new
         # prefilling batches, but need to keep decoding batches
-        if self._upgrade_flag:
+        if self._upgrade_flag == UpgradeType.UPGRADE_WAIT_ALL:
             self._batches = replica_scheduler.on_upgrade()
         else:
             self._batches = replica_scheduler.on_schedule()

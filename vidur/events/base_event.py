@@ -3,7 +3,7 @@ from typing import List
 
 from vidur.metrics import MetricsStore
 from vidur.scheduler import BaseGlobalScheduler
-from vidur.types import EventType
+from vidur.types import EventType, UpgradeType
 
 
 class BaseEvent(ABC):
@@ -16,7 +16,7 @@ class BaseEvent(ABC):
         self._priority_number = self._get_priority_number()
 
         # indicate whether to start upgrading
-        self._upgrade_flag = False
+        self._upgrade_flag = UpgradeType.UPGRADE_NOT_SET
 
     @classmethod
     def generate_id(cls):
@@ -74,5 +74,5 @@ class BaseEvent(ABC):
     def to_chrome_trace(self) -> dict:
         return None
 
-    def set_upgrade_flag(self):
-        self._upgrade_flag = True
+    def set_upgrade_flag(self, upgrade_flag: UpgradeType):
+        self._upgrade_flag = upgrade_flag

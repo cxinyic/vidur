@@ -64,6 +64,8 @@ class BaseReplicaScheduler(ABC):
             for stage_id in range(num_stages)
         }
 
+        self._unfinished_request_queue = {}
+
     @property
     def num_pending_requests(self) -> int:
         return len(self._request_queue)
@@ -100,6 +102,7 @@ class BaseReplicaScheduler(ABC):
 
     def add_request(self, request: Request) -> None:
         self._request_queue.append(request)
+        self._unfinished_request_queue[request.id] = request
 
     def get_replica_stage_scheduler(self, stage_id: int):
         return self._replica_stage_schedulers[stage_id]
@@ -120,6 +123,8 @@ class BaseReplicaScheduler(ABC):
         for request_id in request_ids:
             num_blocks = self._allocation_map.pop(request_id)
             self._num_allocated_blocks -= num_blocks
+            # logger.info(f"replica_id: {self.replica_id} unfinished request queue: {self._unfinished_request_queue}")
+            del self._unfinished_request_queue[request_id]
 
         assert self._num_allocated_blocks >= 0
 

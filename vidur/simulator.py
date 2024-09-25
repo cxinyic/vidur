@@ -4,14 +4,14 @@ import json
 from typing import List
 
 from vidur.config import SimulationConfig
-from vidur.entities import Cluster, Replica
+from vidur.entities import Cluster
 from vidur.events import BaseEvent, RequestArrivalEvent
 from vidur.events.upgrade_event import UpgradeEvent
 from vidur.logger import init_logger
 from vidur.metrics import MetricsStore
 from vidur.request_generator import RequestGeneratorRegistry
 from vidur.scheduler import BaseGlobalScheduler, GlobalSchedulerRegistry
-from vidur.types import EventType
+from vidur.types import EventType, UpgradeType
 
 logger = init_logger(__name__)
 
@@ -91,7 +91,7 @@ class Simulator:
         # assert self._scheduler.is_empty() or self._terminate
         logger.info(f"Simulation after upgrade ended at: {self._time}s")
 
-    def run_before_upgrade(self) -> None:
+    def run_before_upgrade(self, upgrade_type: UpgradeType) -> None:
         self._init_event_queue()
         self._init_upgrade_event()
         logger.info(
@@ -106,9 +106,14 @@ class Simulator:
                 logger.info(f"Upgrade event triggered at time: {event._time}")
                 self._global_upgrade_flag = True
 
-            # For other events, if global upgrade flag is set, set every event's upgrade flag
+            # global_upgrade_flag means that we have met the upgrade event.
+            # For upgrade_no_wait, break the loop and upgrade immediately
+            # For upgrade_wait_all, continue the loop until all the scheduled batches are finished
             if self._global_upgrade_flag:
-                event.set_upgrade_flag()
+                if upgrade_type == UpgradeType.UPGRADE_NO_WAIT or upgrade_type == UpgradeType.UPGRADE_WAIT_PARTIAL:
+                    break
+                else:
+                    event.set_upgrade_flag(upgrade_type)
 
             # logger.info(f"event: {event._event_type} at time: {event._time}, upgrade flag: {event._upgrade_flag}")
             new_events = event.handle_event(self._scheduler, self._metric_store)
@@ -128,9 +133,31 @@ class Simulator:
         # stop and upgrade for constant time
         self._set_time(self._time + self._upgrade_time)
         # store the unfinished requests
-        for replica_id in self._scheduler._replica_schedulers:
-            replica_scheduler = self._scheduler.get_replica_scheduler(replica_id)
-            self._remaining_requests.extend(replica_scheduler._request_queue)
+        if upgrade_type == UpgradeType.UPGRADE_NO_WAIT:
+            # For those scheduled batches that are not finished, reschedule them
+            for replica_id in self._scheduler._replica_schedulers:
+                replica_scheduler = self._scheduler.get_replica_scheduler(replica_id)
+                for request in replica_scheduler._unfinished_request_queue.values():
+                    if request not in replica_scheduler._request_queue:
+                        request.reschedule()
+                self._remaining_requests.extend(
+                    list(replica_scheduler._unfinished_request_queue.values())
+                )
+        elif upgrade_type == UpgradeType.UPGRADE_WAIT_PARTIAL:
+            # For those scheduled batches that are not finished, partially reschedule them
+            for replica_id in self._scheduler._replica_schedulers:
+                replica_scheduler = self._scheduler.get_replica_scheduler(replica_id)
+                for request in replica_scheduler._unfinished_request_queue.values():
+                    if request not in replica_scheduler._request_queue:
+                        request.reschedule_partial()
+                self._remaining_requests.extend(
+                    list(replica_scheduler._unfinished_request_queue.values())
+                )
+        else:
+            # The scheduled batches are finished, only consider request_queue
+            for replica_id in self._scheduler._replica_schedulers:
+                replica_scheduler = self._scheduler.get_replica_scheduler(replica_id)
+                self._remaining_requests.extend(replica_scheduler._request_queue)
 
     def _write_output(self) -> None:
         logger.info("Writing output")
@@ -162,8 +189,8 @@ class Simulator:
 
     def _init_upgrade_event(self) -> None:
         # TODO: check upgrade event time
-        logger.info(f"Add upgrade event at time 1")
-        self._add_event(UpgradeEvent(1))
+        logger.info(f"Add upgrade event at time 15")
+        self._add_event(UpgradeEvent(15))
 
     def _add_remaining_requests(self) -> None:
         for request in self._remaining_requests:

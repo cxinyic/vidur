@@ -116,10 +116,12 @@ class VLLMReplicaScheduler(BaseReplicaScheduler):
                     victim_request.restart()
                     self.free(victim_request.id)
                     self._request_queue = [victim_request] + self._request_queue
+                    self._unfinished_request_queue[victim_request.id] = victim_request
                 else:
                     request.restart()
                     self.free(request.id)
                     self._request_queue = [request] + self._request_queue
+                    self._unfinished_request_queue[request.id] = request
                     break
             else:
                 self._allocate_request(request)
@@ -152,10 +154,12 @@ class VLLMReplicaScheduler(BaseReplicaScheduler):
                     victim_request.restart()
                     self.free(victim_request.id)
                     self._request_queue = [victim_request] + self._request_queue
+                    self._unfinished_request_queue[victim_request.id] = victim_request
                 else:
                     request.restart()
                     self.free(request.id)
                     self._request_queue = [request] + self._request_queue
+                    self._unfinished_request_queue[request.id] = request
                     break
             else:
                 self._allocate_request(request)
