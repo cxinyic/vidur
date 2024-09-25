@@ -45,6 +45,7 @@ def upgrade_serving(upgrade_type: UpgradeType) -> None:
     simulator_upgrade = Simulator(config_upgrade)
     simulator_upgrade._set_time(simulator_old._time)
     simulator_upgrade._remaining_requests = simulator_old._remaining_requests
+    simulator_upgrade._all_requests = simulator_upgrade._remaining_requests
     simulator_upgrade._add_remaining_requests()
     simulator_upgrade.run_with_upgrade()
 
@@ -67,8 +68,8 @@ def main() -> None:
     # upgrade_baseline(UpgradeType.UPGRADE_WAIT_ALL)
     # upgrade_baseline(UpgradeType.UPGRADE_NO_WAIT)
     # upgrade_baseline(UpgradeType.UPGRADE_WAIT_PARTIAL)
-    upgrade_serving(UpgradeType.UPGRADE_SERVE_WAIT_PARTIAL)
-    # upgrade_serving(UpgradeType.UPGRADE_SERVE_KICK_ALL)
+    # upgrade_serving(UpgradeType.UPGRADE_SERVE_WAIT_PARTIAL)
+    upgrade_serving(UpgradeType.UPGRADE_SERVE_KICK_ALL)
     # normal_run()
 
 

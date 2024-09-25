@@ -54,6 +54,7 @@ class Simulator:
         self._upgrade_time = 15
         self._remaining_requests = []
         self._num_upgrade_real_start = 0
+        self._all_requests = []
 
         atexit.register(self._write_output)
 
@@ -105,6 +106,11 @@ class Simulator:
                 break
 
             new_events = event.handle_event(self._scheduler, self._metric_store)
+            # remove the global scheduled requests from all_requests
+            if event._event_type == EventType.GLOBAL_SCHEDULE:
+                for _, request in event._request_mapping:
+                    self._all_requests.remove(request)
+
             self._add_events(new_events)
 
             if self._config.metrics_config.write_json_trace:
@@ -124,6 +130,10 @@ class Simulator:
             self._remaining_requests.extend(
                 list(replica_scheduler._unfinished_request_queue.values())
             )
+        
+        for request in self._all_requests:
+            if request not in self._remaining_requests:
+                self._remaining_requests.append(request)
 
     def run_before_upgrade(self, upgrade_type: UpgradeType) -> None:
         self._init_event_queue()
@@ -148,7 +158,7 @@ class Simulator:
                     self._scheduler._replica_schedulers
                 ):
                     break
-
+            
             # global_upgrade_flag means that we have met the upgrade event.
             # For upgrade_no_wait/wait_partial/serve_kick_all, break the loop and upgrade immediately
             # For upgrade_wait_all, continue the loop until all the scheduled batches are finished
@@ -164,6 +174,11 @@ class Simulator:
 
             # logger.info(f"event: {event._event_type} at time: {event._time}, upgrade flag: {event._upgrade_flag}")
             new_events = event.handle_event(self._scheduler, self._metric_store)
+
+            # remove the global scheduled requests from all_requests
+            if event._event_type == EventType.GLOBAL_SCHEDULE:
+                for _, request in event._request_mapping:
+                    self._all_requests.remove(request)
 
             self._add_events(new_events)
 
@@ -213,6 +228,10 @@ class Simulator:
                 replica_scheduler = self._scheduler.get_replica_scheduler(replica_id)
                 self._remaining_requests.extend(replica_scheduler._request_queue)
 
+        for request in self._all_requests:
+            if request not in self._remaining_requests:
+                self._remaining_requests.append(request)
+
     def _write_output(self) -> None:
         logger.info("Writing output")
 
@@ -237,6 +256,7 @@ class Simulator:
 
     def _init_event_queue(self) -> None:
         requests = self._request_generator.generate()
+        self._all_requests = requests
 
         for request in requests:
             self._add_event(RequestArrivalEvent(request.arrived_at, request))
