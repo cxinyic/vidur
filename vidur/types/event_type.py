@@ -5,11 +5,13 @@ class EventType(BaseIntEnum):
     # at any given time step, call the schedule event at the last
     # to ensure that all the requests are processed
     UPGRADE = 1
-    BATCH_STAGE_ARRIVAL = 2
-    REQUEST_ARRIVAL = 3
-    BATCH_STAGE_END = 4
-    BATCH_END = 5
-    GLOBAL_SCHEDULE = 6
-    REPLICA_SCHEDULE = 7
-    REPLICA_STAGE_SCHEDULE = 8
+    UPGRADE_FINISH = 2
+    UPGRADE_REAL_START = 3
+    BATCH_STAGE_ARRIVAL = 4
+    REQUEST_ARRIVAL = 5
+    BATCH_STAGE_END = 6
+    BATCH_END = 7
+    GLOBAL_SCHEDULE = 8
+    REPLICA_SCHEDULE = 9
+    REPLICA_STAGE_SCHEDULE = 10
 

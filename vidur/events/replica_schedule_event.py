@@ -25,10 +25,11 @@ class ReplicaScheduleEvent(BaseEvent):
         replica_scheduler = scheduler.get_replica_scheduler(self._replica_id)
         # If an upgrade event has been scheduled, do not schedule any new
         # prefilling batches, but need to keep decoding batches
-        if self._upgrade_flag == UpgradeType.UPGRADE_WAIT_ALL:
+        if self._upgrade_flag == UpgradeType.UPGRADE_WAIT_ALL or self._upgrade_flag == UpgradeType.UPGRADE_SERVE_WAIT_PARTIAL:
             self._batches = replica_scheduler.on_upgrade()
         else:
             self._batches = replica_scheduler.on_schedule()
+        # logger.info(f"running get_next_batch_upgrade_serve,id: {self._replica_id}, time at: {self._time}, with already allocated blocks: {replica_scheduler._num_allocated_blocks}")
 
         if not self._batches:
             return []

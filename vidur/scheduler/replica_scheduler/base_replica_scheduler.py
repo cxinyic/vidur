@@ -46,8 +46,8 @@ class BaseReplicaScheduler(ABC):
             self._config.batch_size_cap,
         )
 
-        logger.debug(
-            f"Obtained max batch size of {self._max_batch_size} for replica {self._replica_id}"
+        logger.info(
+            f"Obtained max batch size of {self._max_batch_size}, num_blocks of {self._config.num_blocks} for replica {self._replica_id}"
         )
 
         self._request_queue = []
@@ -65,6 +65,7 @@ class BaseReplicaScheduler(ABC):
         }
 
         self._unfinished_request_queue = {}
+        self._upgrade_real_start = False
 
     @property
     def num_pending_requests(self) -> int:
@@ -140,6 +141,9 @@ class BaseReplicaScheduler(ABC):
         pass
 
     def _get_next_batch_upgrade(self) -> Batch:
+        pass
+
+    def _get_next_batch_upgrade_serve(self) -> Batch:
         pass
 
     def on_upgrade(self) -> List[Batch]:

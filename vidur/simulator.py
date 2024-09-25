@@ -7,6 +7,7 @@ from vidur.config import SimulationConfig
 from vidur.entities import Cluster
 from vidur.events import BaseEvent, RequestArrivalEvent
 from vidur.events.upgrade_event import UpgradeEvent
+from vidur.events.upgrade_finish_event import UpgradeFinishEvent
 from vidur.logger import init_logger
 from vidur.metrics import MetricsStore
 from vidur.request_generator import RequestGeneratorRegistry
@@ -52,6 +53,7 @@ class Simulator:
         self._global_upgrade_flag = False
         self._upgrade_time = 15
         self._remaining_requests = []
+        self._num_upgrade_real_start = 0
 
         atexit.register(self._write_output)
 
@@ -72,7 +74,6 @@ class Simulator:
         logger.info(
             f"Starting simulation with cluster: {self._cluster} and {len(self._event_queue)} requests"
         )
-
         while self._event_queue and not self._terminate:
             _, event = heapq.heappop(self._event_queue)
             self._set_time(event._time)
@@ -91,6 +92,39 @@ class Simulator:
         # assert self._scheduler.is_empty() or self._terminate
         logger.info(f"Simulation after upgrade ended at: {self._time}s")
 
+    # overlap serving with upgrade
+    def run_with_upgrade(self) -> None:
+        # manually set upgrade finishing time(current time + upgrade time)
+        self._init_upgrade_finish_event()
+
+        while self._event_queue and not self._terminate:
+            _, event = heapq.heappop(self._event_queue)
+            self._set_time(event._time)
+            #
+            if event._event_type == EventType.UPGRADE_FINISH:
+                break
+
+            new_events = event.handle_event(self._scheduler, self._metric_store)
+            self._add_events(new_events)
+
+            if self._config.metrics_config.write_json_trace:
+                self._event_trace.append(event.to_dict())
+
+            if self._config.metrics_config.enable_chrome_trace:
+                chrome_trace = event.to_chrome_trace()
+                if chrome_trace:
+                    self._event_chrome_trace.append(chrome_trace)
+
+        logger.info(f"Simulation during upgrade ended at: {self._time}s")
+        for replica_id in self._scheduler._replica_schedulers:
+            replica_scheduler = self._scheduler.get_replica_scheduler(replica_id)
+            for request in replica_scheduler._unfinished_request_queue.values():
+                if request not in replica_scheduler._request_queue:
+                    request.reschedule_partial()
+            self._remaining_requests.extend(
+                list(replica_scheduler._unfinished_request_queue.values())
+            )
+
     def run_before_upgrade(self, upgrade_type: UpgradeType) -> None:
         self._init_event_queue()
         self._init_upgrade_event()
@@ -106,11 +140,24 @@ class Simulator:
                 logger.info(f"Upgrade event triggered at time: {event._time}")
                 self._global_upgrade_flag = True
 
+            # For serve_wait_partial upgrade, if memory usage for all replicas
+            # is low enough, break the loop to do real upgrade
+            if event._event_type == EventType.UPGRADE_REAL_START:
+                self._num_upgrade_real_start += 1
+                if self._num_upgrade_real_start == len(
+                    self._scheduler._replica_schedulers
+                ):
+                    break
+
             # global_upgrade_flag means that we have met the upgrade event.
-            # For upgrade_no_wait, break the loop and upgrade immediately
+            # For upgrade_no_wait/wait_partial/serve_kick_all, break the loop and upgrade immediately
             # For upgrade_wait_all, continue the loop until all the scheduled batches are finished
             if self._global_upgrade_flag:
-                if upgrade_type == UpgradeType.UPGRADE_NO_WAIT or upgrade_type == UpgradeType.UPGRADE_WAIT_PARTIAL:
+                if (
+                    upgrade_type == UpgradeType.UPGRADE_NO_WAIT
+                    or upgrade_type == UpgradeType.UPGRADE_WAIT_PARTIAL
+                    or upgrade_type == UpgradeType.UPGRADE_SERVE_KICK_ALL
+                ):
                     break
                 else:
                     event.set_upgrade_flag(upgrade_type)
@@ -128,11 +175,14 @@ class Simulator:
                 if chrome_trace:
                     self._event_chrome_trace.append(chrome_trace)
 
-        # assert self._scheduler.is_empty() or self._terminate
         logger.info(f"Simulation before upgrade ended at: {self._time}s")
-        # stop and upgrade for constant time
-        self._set_time(self._time + self._upgrade_time)
-        # store the unfinished requests
+        if (
+            upgrade_type != UpgradeType.UPGRADE_SERVE_KICK_ALL
+            and upgrade_type != UpgradeType.UPGRADE_SERVE_WAIT_PARTIAL
+        ):
+            self._set_time(self._time + self._upgrade_time)
+
+        # record the unfinished requests
         if upgrade_type == UpgradeType.UPGRADE_NO_WAIT:
             # For those scheduled batches that are not finished, reschedule them
             for replica_id in self._scheduler._replica_schedulers:
@@ -143,7 +193,11 @@ class Simulator:
                 self._remaining_requests.extend(
                     list(replica_scheduler._unfinished_request_queue.values())
                 )
-        elif upgrade_type == UpgradeType.UPGRADE_WAIT_PARTIAL:
+        elif (
+            upgrade_type == UpgradeType.UPGRADE_WAIT_PARTIAL
+            or upgrade_type == UpgradeType.UPGRADE_SERVE_KICK_ALL
+            or upgrade_type == UpgradeType.UPGRADE_SERVE_WAIT_PARTIAL
+        ):
             # For those scheduled batches that are not finished, partially reschedule them
             for replica_id in self._scheduler._replica_schedulers:
                 replica_scheduler = self._scheduler.get_replica_scheduler(replica_id)
@@ -191,6 +245,9 @@ class Simulator:
         # TODO: check upgrade event time
         logger.info(f"Add upgrade event at time 15")
         self._add_event(UpgradeEvent(15))
+
+    def _init_upgrade_finish_event(self) -> None:
+        self._add_event(UpgradeFinishEvent(self._time + self._upgrade_time))
 
     def _add_remaining_requests(self) -> None:
         for request in self._remaining_requests:
