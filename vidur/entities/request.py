@@ -62,6 +62,8 @@ class Request(BaseEntity):
         self._original_num_prefill_tokens = num_prefill_tokens
         self._original_num_decode_tokens = num_decode_tokens
 
+        self._num_processed_tokens_before_upgrade = 0
+
     @property
     def size(self) -> Tuple[int, int]:
         return (self._num_prefill_tokens, self._num_decode_tokens)
@@ -318,7 +320,7 @@ class Request(BaseEntity):
         self._scheduling_delay = 0
         self._preempted_time = 0
         self._completed_at = 0
-        self._prefill_completed_at = 0
+        
         self._latest_stage_scheduled_at = 0
         self._latest_stage_completed_at = 0
         self._latest_iteration_scheduled_at = 0
@@ -335,12 +337,16 @@ class Request(BaseEntity):
     def reschedule_partial(self):
         logger.debug(f"Rescheduling partial, request {self._id}")
 
+        self._num_processed_tokens_before_upgrade = self._num_processed_tokens
+
         if self._is_prefill_complete:
+            # logger.info(f"Reschedule prefill completed request {self.id}")
             self.restart()
         else:
             self._num_prefill_tokens = self._original_num_prefill_tokens
             self._num_decode_tokens = self._original_num_decode_tokens
             self._num_processed_tokens = 0
+            
 
         self.set_zero()
 
@@ -350,5 +356,6 @@ class Request(BaseEntity):
         self._num_prefill_tokens = self._original_num_prefill_tokens
         self._num_decode_tokens = self._original_num_decode_tokens
         self._num_processed_tokens = 0
+        
 
         self.set_zero()

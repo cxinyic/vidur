@@ -10,9 +10,9 @@ from vidur.types import EventType
 logger = init_logger(__name__)
 
 
-class UpgradeEvent(BaseEvent):
+class UpgradeTriggerEvent(BaseEvent):
     def __init__(self, time: float) -> None:
-        super().__init__(time, EventType.UPGRADE)
+        super().__init__(time, EventType.UPGRADE_TRIGGER)
     
     def handle_event(
         self, scheduler: BaseGlobalScheduler, metrics_store: MetricsStore

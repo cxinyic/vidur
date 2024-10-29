@@ -11,6 +11,7 @@ from vidur.config.flat_dataclass import create_flat_dataclass
 from vidur.config.model_config import BaseModelConfig
 from vidur.config.node_sku_config import BaseNodeSKUConfig
 from vidur.config.utils import dataclass_to_dict
+from vidur.config.upgrade_policy_config import UpgradeConfig
 from vidur.logger import init_logger
 from vidur.types import (
     ExecutionTimePredictorType,
@@ -652,6 +653,10 @@ class SimulationConfig(ABC):
     metrics_config: MetricsConfig = field(
         default_factory=MetricsConfig,
         metadata={"help": "Metrics config."},
+    )
+    upgrade_config: UpgradeConfig = field(
+        default_factory=UpgradeConfig,
+        metadata={"help": "Upgrade policy configuration."},
     )
 
     def __post_init__(self):

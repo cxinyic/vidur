@@ -234,6 +234,34 @@ class MetricsStore:
                 )
                 self._replica_mfu[replica_idx][stage_idx].put(0, 0)
 
+            # Initialize accumulated token counters
+            self._accumulated_tokens = 0
+            self._accumulated_prefill_tokens = 0
+            self._accumulated_decode_tokens = 0
+
+            # Initialize DataSeries for storing accumulated tokens over time
+            self._accumulated_token_metrics_time_series = DataSeries(
+                TIME_STR,
+                "Accumulated Tokens",
+                self._config.subsamples,
+                self._config.save_table_to_wandb,
+                self._config.store_plots,
+            )
+            self._accumulated_prefill_token_metrics_time_series = DataSeries(
+                TIME_STR,
+                "Accumulated Prefill Tokens",
+                self._config.subsamples,
+                self._config.save_table_to_wandb,
+                self._config.store_plots,
+            )
+            self._accumulated_decode_token_metrics_time_series = DataSeries(
+                TIME_STR,
+                "Accumulated Decode Tokens",
+                self._config.subsamples,
+                self._config.save_table_to_wandb,
+                self._config.store_plots,
+            )
+
         self._init_wandb()
 
     def _init_wandb(self):
@@ -370,9 +398,11 @@ class MetricsStore:
         if not self._config.store_request_metrics:
             return
 
-        all_request_metrics = list(
-            self._request_metrics_time_distributions.values()
-        ) + list(self._request_metrics_histogram.values())
+        # all_request_metrics = list(
+        #     self._request_metrics_time_distributions.values()
+        # ) + list(self._request_metrics_histogram.values())
+
+        all_request_metrics = list(self._request_metrics_time_distributions.values())
 
         self._save_as_csv(
             dataseries_list=all_request_metrics,
@@ -381,11 +411,11 @@ class MetricsStore:
             file_name="request_metrics",
         )
 
-        for dataseries in self._request_metrics_histogram.values():
-            dataseries.plot_histogram(base_plot_path, dataseries._y_name)
+        # for dataseries in self._request_metrics_histogram.values():
+        #     dataseries.plot_histogram(base_plot_path, dataseries._y_name)
 
-        for dataseries in self._request_metrics_time_distributions.values():
-            dataseries.plot_cdf(base_plot_path, dataseries._y_name, TIME_STR)
+        # for dataseries in self._request_metrics_time_distributions.values():
+        #     dataseries.plot_cdf(base_plot_path, dataseries._y_name, TIME_STR)
 
     def _store_batch_metrics(self, base_plot_path: str):
         if not self._config.store_batch_metrics:
@@ -479,10 +509,22 @@ class MetricsStore:
         os.makedirs(dir_plot_path, exist_ok=True)
 
         self._store_request_metrics(dir_plot_path)
-        self._store_batch_metrics(dir_plot_path)
-        self._store_completion_metrics(dir_plot_path)
-        self._store_operation_metrics(dir_plot_path)
-        self._store_utilization_metrics(dir_plot_path)
+        # self._store_batch_metrics(dir_plot_path)
+        # self._store_completion_metrics(dir_plot_path)
+        # self._store_operation_metrics(dir_plot_path)
+        # self._store_utilization_metrics(dir_plot_path)
+
+        # Optional: Save accumulated token metrics as CSV or log them
+        self._save_as_csv(
+            dataseries_list=[
+                self._accumulated_token_metrics_time_series,
+                self._accumulated_prefill_token_metrics_time_series,
+                self._accumulated_decode_token_metrics_time_series,
+            ],
+            key_to_join=TIME_STR,
+            base_path=self._config.output_dir,
+            file_name="accumulated_tokens",
+        )
 
     @if_write_metrics
     def on_request_arrival(self, time: float, request: Request) -> None:
@@ -520,64 +562,99 @@ class MetricsStore:
             RequestCompletionMetricsTimeSeries.REQUEST_COMPLETION
         ].put(request.completed_at, 1)
 
+        # Add the request arrival time to the metrics
+        self._request_metrics_time_distributions[
+            RequestMetricsTimeDistributions.REQUEST_ARRIVAL_TIME
+        ].put(request.id, request.arrived_at)
+
+        # Add the request completion time to the metrics
+        self._request_metrics_time_distributions[
+            RequestMetricsTimeDistributions.REQUEST_COMPLETION_TIME
+        ].put(request.id, request.completed_at)
+
         self._request_metrics_time_distributions[
             RequestMetricsTimeDistributions.REQUEST_E2E_TIME
         ].put(request.id, request.e2e_time)
-        self._request_metrics_time_distributions[
-            RequestMetricsTimeDistributions.REQUEST_E2E_TIME_NORMALIZED
-        ].put(request.id, request.e2e_time_normalized)
+        # self._request_metrics_time_distributions[
+        #     RequestMetricsTimeDistributions.REQUEST_E2E_TIME_NORMALIZED
+        # ].put(request.id, request.e2e_time_normalized)
         self._request_metrics_time_distributions[
             RequestMetricsTimeDistributions.REQUEST_EXECUTION_TIME
         ].put(request.id, request.execution_time)
-        self._request_metrics_time_distributions[
-            RequestMetricsTimeDistributions.REQUEST_EXECUTION_TIME_NORMALIZED
-        ].put(request.id, request.execution_time_normalized)
-        self._request_metrics_time_distributions[
-            RequestMetricsTimeDistributions.REQUEST_MODEL_EXECUTION_TIME
-        ].put(request.id, request.model_execution_time)
-        self._request_metrics_time_distributions[
-            RequestMetricsTimeDistributions.REQUEST_MODEL_EXECUTION_TIME_NORMALIZED
-        ].put(request.id, request.model_execution_time_normalized)
-        self._request_metrics_time_distributions[
-            RequestMetricsTimeDistributions.REQUEST_PREEMPTION_TIME
-        ].put(request.id, request.preempted_time)
+        # self._request_metrics_time_distributions[
+        #     RequestMetricsTimeDistributions.REQUEST_EXECUTION_TIME_NORMALIZED
+        # ].put(request.id, request.execution_time_normalized)
+        # self._request_metrics_time_distributions[
+        #     RequestMetricsTimeDistributions.REQUEST_MODEL_EXECUTION_TIME
+        # ].put(request.id, request.model_execution_time)
+        # self._request_metrics_time_distributions[
+        #     RequestMetricsTimeDistributions.REQUEST_MODEL_EXECUTION_TIME_NORMALIZED
+        # ].put(request.id, request.model_execution_time_normalized)
+        # self._request_metrics_time_distributions[
+        #     RequestMetricsTimeDistributions.REQUEST_PREEMPTION_TIME
+        # ].put(request.id, request.preempted_time)
         self._request_metrics_time_distributions[
             RequestMetricsTimeDistributions.REQUEST_SCHEDULING_DELAY
         ].put(request.id, request.scheduling_delay)
-        self._request_metrics_time_distributions[
-            RequestMetricsTimeDistributions.REQUEST_EXECUTION_PLUS_PREEMPTION_TIME
-        ].put(request.id, request.execution_time + request.preempted_time)
-        self._request_metrics_time_distributions[
-            RequestMetricsTimeDistributions.REQUEST_EXECUTION_PLUS_PREEMPTION_TIME_NORMALIZED
-        ].put(
-            request.id,
-            (request.execution_time + request.preempted_time)
-            / request.num_decode_tokens,
-        )
+        # self._request_metrics_time_distributions[
+        #     RequestMetricsTimeDistributions.REQUEST_EXECUTION_PLUS_PREEMPTION_TIME
+        # ].put(request.id, request.execution_time + request.preempted_time)
+        # self._request_metrics_time_distributions[
+        #     RequestMetricsTimeDistributions.REQUEST_EXECUTION_PLUS_PREEMPTION_TIME_NORMALIZED
+        # ].put(
+        #     request.id,
+        #     (request.execution_time + request.preempted_time)
+        #     / request.num_decode_tokens,
+        # )
         self._request_metrics_time_distributions[
             RequestMetricsTimeDistributions.PREFILL_TIME_E2E
         ].put(request.id, request.prefill_completed_at - request.arrived_at)
-        self._request_metrics_time_distributions[
-            RequestMetricsTimeDistributions.PREFILL_TIME_EXECUTION_PLUS_PREEMPTION
-        ].put(request.id, request.prefill_completed_at - request.scheduled_at)
-        self._request_metrics_time_distributions[
-            RequestMetricsTimeDistributions.PREFILL_TIME_EXECUTION_PLUS_PREEMPTION_NORMALIZED
-        ].put(
-            request.id,
-            (request.prefill_completed_at - request.scheduled_at)
-            / request.num_prefill_tokens,
-        )
+        # self._request_metrics_time_distributions[
+        #     RequestMetricsTimeDistributions.PREFILL_TIME_EXECUTION_PLUS_PREEMPTION
+        # ].put(request.id, request.prefill_completed_at - request.scheduled_at)
+        # self._request_metrics_time_distributions[
+        #     RequestMetricsTimeDistributions.PREFILL_TIME_EXECUTION_PLUS_PREEMPTION_NORMALIZED
+        # ].put(
+        #     request.id,
+        #     (request.prefill_completed_at - request.scheduled_at)
+        #     / request.num_prefill_tokens,
+        # )
         self._request_metrics_time_distributions[
             RequestMetricsTimeDistributions.DECODE_TIME_EXECUTION_PLUS_PREEMPTION_NORMALIZED
         ].put(
             request.id,
             (request.completed_at - request.prefill_completed_at)
-            / request.num_decode_tokens,
+            / request._original_num_decode_tokens,
+        )
+        self._request_metrics_time_distributions[
+            RequestMetricsTimeDistributions.REQUEST_TOTAL_DECODE_TOKENS
+        ].put(
+            request.id,
+            request._original_num_decode_tokens,
+        )
+        self._request_metrics_time_distributions[
+            RequestMetricsTimeDistributions.REQUEST_TOTAL_PREFILL_TOKENS
+        ].put(
+            request.id,
+            request._original_num_prefill_tokens,
+        )
+        self._request_metrics_time_distributions[
+            RequestMetricsTimeDistributions.REQUEST_TOTAL_PROCESSED_BEFORE_UPGRADE
+        ].put(
+            request.id,
+            request._num_processed_tokens_before_upgrade,
         )
 
-        self._request_metrics_histogram[
-            RequestMetricsHistogram.REQUEST_NUM_RESTARTS
-        ].put(request.id, request.num_restarts)
+        self._request_metrics_time_distributions[
+            RequestMetricsTimeDistributions.REQUEST_TO_FINISH_TOKENS
+        ].put(
+            request.id,
+            request._original_num_prefill_tokens + request._original_num_decode_tokens - request._num_processed_tokens_before_upgrade,
+        )
+
+        # self._request_metrics_histogram[
+        #     RequestMetricsHistogram.REQUEST_NUM_RESTARTS
+        # ].put(request.id, request.num_restarts)
 
     def _update_per_token_execution_times(
         self, time: float, request: Request, batch: Batch
@@ -653,6 +730,20 @@ class MetricsStore:
 
         if not self._config.store_batch_metrics:
             return
+
+        # Accumulate tokens over time
+        self._accumulated_tokens += batch.total_num_tokens
+        self._accumulated_prefill_tokens += batch.num_prefill_tokens
+        self._accumulated_decode_tokens += batch.num_decode_tokens
+
+        # Record the accumulated tokens with the current time
+        self._accumulated_token_metrics_time_series.put(time, self._accumulated_tokens)
+        self._accumulated_prefill_token_metrics_time_series.put(
+            time, self._accumulated_prefill_tokens
+        )
+        self._accumulated_decode_token_metrics_time_series.put(
+            time, self._accumulated_decode_tokens
+        )
 
         self._push_metric(
             BatchMetricsTimeDistribution.BATCH_EXECUTION_TIME,

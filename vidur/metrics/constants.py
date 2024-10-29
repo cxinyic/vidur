@@ -32,25 +32,31 @@ class CpuOperationMetrics(enum.Enum):
 
 class RequestMetricsTimeDistributions(enum.Enum):
     REQUEST_E2E_TIME = "request_e2e_time"
-    REQUEST_E2E_TIME_NORMALIZED = "request_e2e_time_normalized"
+    # REQUEST_E2E_TIME_NORMALIZED = "request_e2e_time_normalized"
     REQUEST_EXECUTION_TIME = "request_execution_time"
-    REQUEST_EXECUTION_TIME_NORMALIZED = "request_execution_time_normalized"
-    REQUEST_MODEL_EXECUTION_TIME = "request_model_execution_time"
-    REQUEST_MODEL_EXECUTION_TIME_NORMALIZED = "request_model_execution_time_normalized"
-    REQUEST_PREEMPTION_TIME = "request_preemption_time"
+    # REQUEST_EXECUTION_TIME_NORMALIZED = "request_execution_time_normalized"
+    # REQUEST_MODEL_EXECUTION_TIME = "request_model_execution_time"
+    # REQUEST_MODEL_EXECUTION_TIME_NORMALIZED = "request_model_execution_time_normalized"
+    # REQUEST_PREEMPTION_TIME = "request_preemption_time"
     REQUEST_SCHEDULING_DELAY = "request_scheduling_delay"
-    REQUEST_EXECUTION_PLUS_PREEMPTION_TIME = "request_execution_plus_preemption_time"
-    REQUEST_EXECUTION_PLUS_PREEMPTION_TIME_NORMALIZED = (
-        "request_execution_plus_preemption_time_normalized"
-    )
+    # REQUEST_EXECUTION_PLUS_PREEMPTION_TIME = "request_execution_plus_preemption_time"
+    # REQUEST_EXECUTION_PLUS_PREEMPTION_TIME_NORMALIZED = (
+    #     "request_execution_plus_preemption_time_normalized"
+    # )
     PREFILL_TIME_E2E = "prefill_e2e_time"
-    PREFILL_TIME_EXECUTION_PLUS_PREEMPTION = "prefill_time_execution_plus_preemption"
-    PREFILL_TIME_EXECUTION_PLUS_PREEMPTION_NORMALIZED = (
-        "prefill_time_execution_plus_preemption_normalized"
-    )
+    # PREFILL_TIME_EXECUTION_PLUS_PREEMPTION = "prefill_time_execution_plus_preemption"
+    # PREFILL_TIME_EXECUTION_PLUS_PREEMPTION_NORMALIZED = (
+    #     "prefill_time_execution_plus_preemption_normalized"
+    # )
     DECODE_TIME_EXECUTION_PLUS_PREEMPTION_NORMALIZED = (
         "decode_time_execution_plus_preemption_normalized"
     )
+    REQUEST_ARRIVAL_TIME = "request_arrival_time"
+    REQUEST_COMPLETION_TIME = "request_completion_time"
+    REQUEST_TOTAL_DECODE_TOKENS = "request_total_decode_tokens"
+    REQUEST_TOTAL_PREFILL_TOKENS = "request_total_prefill_tokens"
+    REQUEST_TOTAL_PROCESSED_BEFORE_UPGRADE = "request_total_processed_before_upgrade"
+    REQUEST_TO_FINISH_TOKENS = "request_to_finish_tokens"
 
 
 class TokenMetricsTimeDistribution(enum.Enum):

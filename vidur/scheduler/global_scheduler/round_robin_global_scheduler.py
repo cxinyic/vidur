@@ -10,7 +10,7 @@ class RoundRobinGlobalScheduler(BaseGlobalScheduler):
         self._request_counter = 0
 
     def schedule(self) -> List[Tuple[int, Request]]:
-        self.sort_requests()
+        # self.sort_requests()
 
         request_mapping = []
         while self._request_queue:

@@ -65,7 +65,7 @@ class BaseReplicaScheduler(ABC):
         }
 
         self._unfinished_request_queue = {}
-        self._upgrade_real_start = False
+        self._pre_upgrade_finish = False
 
     @property
     def num_pending_requests(self) -> int:
@@ -140,16 +140,16 @@ class BaseReplicaScheduler(ABC):
     def _get_next_batch(self) -> Batch:
         pass
 
-    def _get_next_batch_upgrade(self) -> Batch:
+    def _get_next_batch_decode(self) -> Batch:
         pass
 
-    def _get_next_batch_upgrade_serve(self) -> Batch:
+    def _get_next_batch_kick_to_memory_threshold(self) -> Batch:
         pass
 
-    def on_upgrade(self) -> List[Batch]:
+    def on_schedule_decode(self) -> List[Batch]:
         scheduled_batches = []
         while self._num_running_batches < self._num_stages:
-            batch = self._get_next_batch_upgrade()
+            batch = self._get_next_batch_decode()
             if not batch:
                 break
             scheduled_batches.append(batch)
@@ -160,6 +160,16 @@ class BaseReplicaScheduler(ABC):
         scheduled_batches = []
         while self._num_running_batches < self._num_stages:
             batch = self._get_next_batch()
+            if not batch:
+                break
+            scheduled_batches.append(batch)
+            self._num_running_batches += 1
+        return scheduled_batches
+    
+    def on_schedule_kick_to_memory_threshold (self) -> List[Batch]:
+        scheduled_batches = []
+        while self._num_running_batches < self._num_stages:
+            batch = self._get_next_batch_kick_to_memory_threshold()
             if not batch:
                 break
             scheduled_batches.append(batch)

@@ -4,7 +4,7 @@ from vidur.events import BaseEvent
 from vidur.logger import init_logger
 from vidur.metrics import MetricsStore
 from vidur.scheduler import BaseGlobalScheduler
-from vidur.types import EventType, UpgradeType
+from vidur.types import EventType, PreUpgradeType
 
 logger = init_logger(__name__)
 
@@ -21,15 +21,20 @@ class ReplicaScheduleEvent(BaseEvent):
         self, scheduler: BaseGlobalScheduler, metrics_store: MetricsStore
     ) -> List[BaseEvent]:
         from vidur.events.batch_stage_arrival_event import BatchStageArrivalEvent
+        from vidur.events.upgrade_pre_finish_event import UpgradePreFinishEvent
 
         replica_scheduler = scheduler.get_replica_scheduler(self._replica_id)
-        # If an upgrade event has been scheduled, do not schedule any new
-        # prefilling batches, but need to keep decoding batches
-        if self._upgrade_flag == UpgradeType.UPGRADE_WAIT_ALL or self._upgrade_flag == UpgradeType.UPGRADE_SERVE_WAIT_PARTIAL:
-            self._batches = replica_scheduler.on_upgrade()
+
+        # For PRE_WAIT_ALL policy, don't schedule any new requests and only do decoding
+        if (
+            self._pre_upgrade_flag == PreUpgradeType.PRE_WAIT_ALL
+            or self._pre_upgrade_flag == PreUpgradeType.PRE_WAIT_MEMORY_THRESHOLD
+        ):
+            self._batches = replica_scheduler.on_schedule_decode()
+        elif self._pre_upgrade_flag == PreUpgradeType.PRE_KICK_TO_MEMORY_THRESHOLD:
+            self._batches = replica_scheduler.on_schedule_kick_to_memory_threshold()
         else:
             self._batches = replica_scheduler.on_schedule()
-        # logger.info(f"running get_next_batch_upgrade_serve,id: {self._replica_id}, time at: {self._time}, with already allocated blocks: {replica_scheduler._num_allocated_blocks}")
 
         if not self._batches:
             return []
@@ -41,6 +46,21 @@ class ReplicaScheduleEvent(BaseEvent):
 
         for batch in self._batches:
             batch.on_schedule(self.time)
+
+        if (
+            not replica_scheduler._pre_upgrade_finish
+            and self._pre_upgrade_flag == PreUpgradeType.PRE_KICK_TO_MEMORY_THRESHOLD
+        ):
+            replica_scheduler._pre_upgrade_finish = True
+            return [UpgradePreFinishEvent(self.time)] + [
+                BatchStageArrivalEvent(
+                    self.time,
+                    self._replica_id,
+                    0,  # stage_id
+                    batch,
+                )
+                for batch in self._batches
+            ]
 
         return [
             BatchStageArrivalEvent(

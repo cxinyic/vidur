@@ -4,7 +4,7 @@ from vidur.events import BaseEvent
 from vidur.logger import init_logger
 from vidur.metrics import MetricsStore
 from vidur.scheduler import BaseGlobalScheduler
-from vidur.types import EventType, UpgradeType
+from vidur.types import EventType, PreUpgradeType
 
 logger = init_logger(__name__)
 
@@ -20,9 +20,9 @@ class GlobalScheduleEvent(BaseEvent):
         self, scheduler: BaseGlobalScheduler, metrics_store: MetricsStore
     ) -> List[BaseEvent]:
         from vidur.events.replica_schedule_event import ReplicaScheduleEvent
-
-        # If an upgrade event has been scheduled, do not schedule any new requests
-        if self._upgrade_flag != UpgradeType.UPGRADE_NOT_SET:
+        
+        # If upgrade has been triggered, do not schedule any new requests
+        if self._pre_upgrade_flag != PreUpgradeType.PRE_NOT_SET:
             return []
         self._replica_set = set()
         self._request_mapping = scheduler.schedule()

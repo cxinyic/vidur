@@ -184,3 +184,64 @@ class SarathiReplicaScheduler(BaseReplicaScheduler):
             return
 
         return Batch(self._replica_id, requests, num_tokens)
+
+    def _get_next_batch_decode(self) -> Batch:
+        requests = []
+        num_tokens = []
+        skipped_requests = []
+        num_batch_tokens = 0
+
+        # Only handle preempted requests that have completed their prefill
+        while self._preempted_requests:
+            if len(requests) == self._max_micro_batch_size:
+                break
+
+            request = self._preempted_requests.pop(0)
+
+            # Skip requests that haven't completed prefill
+            if not request.is_prefill_complete:
+                skipped_requests.append(request)
+                continue
+
+            # Get number of tokens to process for this request
+            next_num_tokens = self._get_request_next_num_tokens(
+                request, False, num_batch_tokens  # contains_prefill is always False for decode-only
+            )
+
+            if next_num_tokens == 0:
+                skipped_requests.append(request)
+                continue
+
+            # Try to allocate memory for this request
+            while not self._can_allocate_request(request):
+                # If we can't allocate, try to free memory by evicting other preempted requests
+                if self._preempted_requests:
+                    victim_request = self._preempted_requests.pop(-1)
+                    victim_request.restart()
+                    self.free(victim_request.id)
+                    self._request_queue = [victim_request] + self._request_queue
+                else:
+                    # If no other requests to evict, restart this request
+                    request.restart()
+                    self.free(request.id)
+                    self._request_queue = [request] + self._request_queue
+                    break
+            else:
+                # Successfully allocated memory
+                self._allocate_request(request)
+                assert request.is_prefill_complete
+                num_batch_tokens += next_num_tokens
+                requests.append(request)
+                num_tokens.append(next_num_tokens)
+
+        # Re-add the skipped requests to the front of the queue
+        # Maintain FIFO ordering by sorting based on arrival time
+        self._preempted_requests = skipped_requests + self._preempted_requests
+        self._preempted_requests = sorted(
+            self._preempted_requests, key=lambda req: req.arrived_at
+        )
+
+        if not requests:
+            return
+
+        return Batch(self._replica_id, requests, num_tokens)

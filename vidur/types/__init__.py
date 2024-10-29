@@ -10,7 +10,7 @@ from vidur.types.replica_scheduler_type import ReplicaSchedulerType
 from vidur.types.request_generator_type import RequestGeneratorType
 from vidur.types.request_interval_generator_type import RequestIntervalGeneratorType
 from vidur.types.request_length_generator_type import RequestLengthGeneratorType
-from vidur.types.upgrade_type import UpgradeType
+from vidur.types.upgrade_type import PreUpgradeType, DuringUpgradeType, PostUpgradeType
 
 __all__ = [
     EventType,
@@ -25,5 +25,7 @@ __all__ = [
     NormType,
     ActivationType,
     BaseIntEnum,
-	UpgradeType,
+	PreUpgradeType,
+	DuringUpgradeType,
+	PostUpgradeType,
 ]
