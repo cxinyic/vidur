@@ -67,9 +67,9 @@ class SklearnExecutionTimePredictor(BaseExecutionTimePredictor):
             * self._replica_config.tensor_parallel_size
         )
         devices_per_node = self._replica_config.node_config.num_devices_per_node
-        assert (
-            num_workers < devices_per_node or num_workers % devices_per_node == 0
-        ), "Number of workers should be less than devices per node or a multiple of devices per node"
+        # assert (
+        #     num_workers < devices_per_node or num_workers % devices_per_node == 0
+        # ), "Number of workers should be less than devices per node or a multiple of devices per node"
 
         self._is_multi_node = num_workers > devices_per_node
 

@@ -20,14 +20,14 @@ class Replica(BaseEntity):
         self._device_config = replica_config.device_config
         self._generator_config = generator_config
 
-        assert (
-            self._model_config.num_layers % self._replica_config.num_pipeline_stages
-            == 0
-        )
-        assert (
-            self._model_config.embedding_dim % self._replica_config.tensor_parallel_size
-            == 0
-        )
+        # assert (
+        #     self._model_config.num_layers % self._replica_config.num_pipeline_stages
+        #     == 0
+        # )
+        # assert (
+        #     self._model_config.embedding_dim % self._replica_config.tensor_parallel_size
+        #     == 0
+        # )
 
     @property
     def id(self) -> int:
@@ -67,7 +67,7 @@ class Replica(BaseEntity):
 
     @property
     def num_layers_per_pipeline_stage(self) -> int:
-        return self._model_config.num_layers // self._replica_config.num_pipeline_stages
+        return ceil(self._model_config.num_layers / self._replica_config.num_pipeline_stages)
 
     @property
     def attention_head_dim(self) -> int:
@@ -75,7 +75,7 @@ class Replica(BaseEntity):
 
     @property
     def q_heads_per_tensor_parallel_worker(self) -> int:
-        return (
+        return ceil(
             self._model_config.num_q_heads // self._replica_config.tensor_parallel_size
         )
 

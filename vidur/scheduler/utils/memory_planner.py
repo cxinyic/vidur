@@ -1,7 +1,9 @@
 from vidur.config import ReplicaConfig
 from vidur.entities.replica import Replica
 from vidur.utils.param_counter import ParamCounter
+from vidur.logger import init_logger
 
+logger = init_logger(__name__)
 
 class MemoryPlanner:
     def __init__(self, replica_config: ReplicaConfig, replica: Replica) -> None:
@@ -40,12 +42,25 @@ class MemoryPlanner:
         number_of_requests = (
             memory_for_kv_cache // kv_cache_memory_per_device_per_request
         )
+        logger.info(
+            f"memory for kv cache percentage: {memory_for_kv_cache / available_memory}"
+        )
 
         assert (
             number_of_requests > 0
         ), "Not enough memory to store even a single request"
 
         return number_of_requests
+    
+    def get_param_memory_usage_percent(self) -> int:
+        available_memory = (
+            self._replica.total_memory_gb
+            * 1024**3
+            * (1 - self._replica.memory_margin_fraction)
+        )
+        parameter_memory_per_device = self._get_parameter_memory_per_device()
+        return (parameter_memory_per_device * 100) / available_memory
+
 
     def get_max_request_slots(self) -> int:
         return self.get_max_batch_size() * self._replica.num_pipeline_stages

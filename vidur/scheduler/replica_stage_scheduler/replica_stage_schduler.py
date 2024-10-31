@@ -11,14 +11,18 @@ class ReplicaStageScheduler:
         stage_id: int,
         is_last_stage: bool,
         execution_time_predictor: BaseExecutionTimePredictor,
+        execution_time_predictor_extra: BaseExecutionTimePredictor,
+        tensor_parallel_weight: float,
     ) -> None:
         self._replica_id = replica_id
         self._stage_id = stage_id
         self._is_last_stage = is_last_stage
         self._execution_time_predictor = execution_time_predictor
+        self._execution_time_predictor_extra = execution_time_predictor_extra
 
         self._batch_queue = []
         self._is_busy = False
+        self._tensor_parallel_weight = tensor_parallel_weight
 
     @property
     def is_last_stage(self) -> bool:
@@ -43,8 +47,25 @@ class ReplicaStageScheduler:
             batch,
             self._stage_id,
         )
+        execution_time_extra = self._execution_time_predictor_extra.get_execution_time(
+            batch,
+            self._stage_id,
+        )
         total_execution_time = execution_time.total_time
         model_execution_time = execution_time.model_time
+
+        total_execution_time_extra = execution_time_extra.total_time
+        model_execution_time_extra = execution_time_extra.model_time
+
+        total_execution_time = (
+            total_execution_time * (1 - self._tensor_parallel_weight)
+            + total_execution_time_extra * self._tensor_parallel_weight
+        )
+        model_execution_time = (
+            model_execution_time * (1 - self._tensor_parallel_weight)
+            + model_execution_time_extra * self._tensor_parallel_weight
+        )
+
         batch_stage = BatchStage(
             batch.id,
             self._replica_id,

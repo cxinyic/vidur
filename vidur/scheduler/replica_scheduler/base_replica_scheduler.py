@@ -24,6 +24,8 @@ class BaseReplicaScheduler(ABC):
         replica: Replica,
         num_stages: int,
         execution_time_predictor: BaseExecutionTimePredictor,
+        execution_time_predictor_extra:BaseExecutionTimePredictor,
+        tensor_parallel_weight: float, 
     ) -> None:
         self._config = replica_scheduler_config
         self._replica_config = replica_config
@@ -60,12 +62,15 @@ class BaseReplicaScheduler(ABC):
                 stage_id,
                 stage_id == num_stages - 1,
                 execution_time_predictor,
+                execution_time_predictor_extra,
+                tensor_parallel_weight=tensor_parallel_weight,
             )
             for stage_id in range(num_stages)
         }
 
         self._unfinished_request_queue = {}
         self._pre_upgrade_finish = False
+        self._param_memory_usage_percent = memory_planner.get_param_memory_usage_percent()
 
     @property
     def num_pending_requests(self) -> int:
@@ -81,8 +86,9 @@ class BaseReplicaScheduler(ABC):
 
     @property
     def memory_usage_percent(self) -> int:
-        return (self._num_allocated_blocks * 100) / self._config.num_blocks
-
+        kv_usage_percent = (self._num_allocated_blocks * 100) / self._config.num_blocks
+        return self._param_memory_usage_percent + kv_usage_percent*(1-self._param_memory_usage_percent/100)
+        
     def is_empty(self) -> bool:
         return (
             self.num_pending_requests == 0
